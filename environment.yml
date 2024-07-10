@@ -14,8 +14,6 @@ dependencies:
   - cftime
   - cartopy
   - matplotlib
-  - cdo
-  - python-cdo
   - tqdm
   - ca-certificates
   - certifi
