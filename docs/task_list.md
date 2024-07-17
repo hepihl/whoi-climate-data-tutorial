@@ -1,6 +1,7 @@
 # Table of contents
 - [Thu, Jul 11: defining a climate index](#Thursday,-Jul-11:-defining-a-climate-index)
 - [Tue, Jul 16: model validation](#Tuesday,-Jul-16:-model-validation)
+- [Wed, Jul 17: climate change detection](#Wed,-Jul-17:-Climate-change-detection-(1/2))
 
 # Thursday, Jul 11: defining a climate index
 
@@ -19,7 +20,7 @@ Part 3: [Compute a climate index (monthly temperature anomaly in Woods Hole)](#P
 </p>
 
 ## Part 1: Setting filepaths and importing packages
-1. __Open the [0_xarray_tutorial.ipynb](scripts/0_xarray_tutorial.ipynb) notebook__. You can do this using your own virtual environment or in the cloud using Google Colab (see [instructions for Colab](#Google-Colab-instructions)).
+1. __Open the [0_xarray_tutorial.ipynb](../scripts/0_xarray_tutorial.ipynb) notebook__. You can do this using your own virtual environment or in the cloud using Google Colab (see [instructions for Colab](#Google-Colab-instructions)).
 2. __Run the 1<sup>st</sup> code cell__ (under the header "Check if we're running in Google Colab"):
 ```python
 try:
@@ -90,7 +91,7 @@ climate_index = t2m_WH.groupby("time.month") - t2m_WH_monthly_avg
 
 ## Overview:
 Part 1. [Set filepaths and import packages](#Part-1:-Setting-filepaths)  
-Part 2: [Open the ERA5 temperature data](#Part-2:-Open-data)  
+Part 2: [Open the data](#Part-2:-Open-data)  
 Part 3: [Subset data in time and space](#Part-3:-Subset-data-in-time-and-space)  
 Part 4: [Plot the bias](#Part-4:-Plot-the-bias)
 
@@ -101,7 +102,7 @@ Part 4: [Plot the bias](#Part-4:-Plot-the-bias)
 
 
 ## Part 1: Setting filepaths
-1. __Open the [1_model_validation.ipynb](scripts/1_model_validation.ipynb) notebook__. You can do this using your own virtual environment or in the cloud using Google Colab (see [instructions for Colab](#Google-Colab-instructions)).
+1. __Open the [1_model_validation_tutorial.ipynb](../scripts/1_model_validation_tutorial.ipynb) notebook__. You can do this using your own virtual environment or in the cloud using Google Colab (see [instructions for Colab](#Google-Colab-instructions)).
 2. __Run the 1<sup>st</sup> code cell__ (under the header "Check if we're running in Google Colab"):
 ```python
 try:
@@ -196,6 +197,158 @@ ax.set_title("Bias")
 ## render the plot
 plt.show()
 ```
+
+# Wed, Jul 17: Climate change detection (1/2)
+In this tutorial, most of the code is already written – we'll fill in the important parts (labeled with "<mark>To-do</mark>"s in the accompanying notebook, [1.5_detection_tutorial.ipynb](../scripts/1.5_detection_tutorial.ipynb)). Below are detailed instructions for how to complete the <mark>To-do</mark>s and run the entire notebook (note: if the "<mark>To-do</mark>"s aren't completed in the notebook, the code will not run).
+
+## Overview:
+Part 1. [Set filepaths and import packages](#Part-1:-Set-filepaths)  
+Part 2: [Open the CESM data](#Part-2:-Open-CESM-data-and-compute-index)  
+Part 3: [Draw random samples from PI-control](#Part-3:-Draw-random-samples-from-PI-control)  
+Part 4: [Make a histogram](#Part-4:-Make-a-histogram)
+
+## Goal figures:
+<p float="left">
+ <img src="../readme_figs/task_list_cesm_timeseries.png" width=600" />
+</p>
+<p float="left">
+ <img src="../readme_figs/task_list_cesm_histogram.png" width="400" />
+</p>
+
+## Part 1: Set filepaths
+1. __Open the [1.5_detection_tutorial.ipynb](../scripts/1.5_detection_tutorial.ipynb) notebook__. You can do this using your own virtual environment or in the cloud using Google Colab (see [instructions for Colab](#Google-Colab-instructions)).
+2. __Run the 1<sup>st</sup> code cell__ (under the header "Check if we're running in Google Colab"):
+```python
+try:
+    import google colab
+    ...
+    IN_COLAB = True
+
+except:
+    IN_COLAB = False
+
+```
+The purpose of this cell is to detect if we're using Google Colab and, if so, link the notebook with Google Drive. If you're using Colab, you may get an error message about the kernel crashing after the cell finishes executing – if so, run the cell again; it seems to work for me the second time.
+
+3. <mark>To-do</mark>: __Update the filepaths ```hist_path``` and ```pico_path``` in the 2<sup>nd</sup> code cell.__ These are the paths to the 2m-temperature data for CESM2 climate model's "historical" and "pre-industrial control" runs, respectively. If you're using Colab (```IN_COLAB``` is True), you shouldn't have to change anything. If you're not using Colab, you need to modify the filepath to match the location of the data (if you're on Windows, you may have issues with backslashes; see [note below](#Windows-filepaths)).
+```python
+if IN_COLAB:
+
+    ### This is the path to use with Google Colab.
+    ### You shouldn't need to change it.
+    hist_path = ...
+    pico_path = ...
+
+else:
+
+    ### Modify this path if you're *not* on Google Colab.
+    ### It should be the path to the data on your computer.
+    hist_path = ...
+    pico_path = ...
+```
+
+## Part 2: Open CESM data and compute index
+4. __Run code cells in this section__: these are all things we've covered already, so we'll breeze through it. *You shouldn't need to modify any code for this section to run*. In short, the code in this section does the following things: trims the data, loads it into memory, and compute the Woods Hole "climate index" (2m-temperature in the grid cell closest to Woods Hole). After running the code in this section, we'll have two xr.DataArrays representing timeseries of annual-mean 2m-temperature in the historical and pre-industrial control simulations, respectively. In the code, these variables are called ```T2m_WH_hist``` and ```T2m_WH_pico```; each are xr.DataArrays with 1-dimension (```"year"```).
+
+## Part 3: Draw random samples from PI-control
+5. <mark>To-do</mark>: We're going to estimate the probability distribution for 
+the PI-control run by drawing lots of random samples (with replacement). Let's start by __writing a function which draws a single random sample__ of length ```nyears``` and computes the mean. For example,
+```python
+def get_sample_mean(data, nyears):
+    """
+    Function draws a random sample from given dataset,
+    and averages over period.
+    Args:
+        'data': xr.DataArray to draw samples from 
+        'nyears': integer specifying how many years in each sample
+        
+    Returns:
+        'sample_mean': xr.DataArray containing mean of single sample
+    """
+
+    ## Select start/end years for the sample
+    possible_start_years = data.year[:-nyears]
+    start_year = rng.choice(possible_start_years)
+    end_year = start_year + nyears
+
+    ## Select the sample
+    sample = data.sel(year=slice(start_year, end_year))
+
+    ## compute sample mean
+    sample_mean = sample.mean("year")
+
+    return sample_mean
+```
+
+6. <mark>To-do</mark>: Next, __write a function which draws multiple samples__ and computes the mean of each. For example,
+```python
+def get_sample_means(data, nsamples, nyears=30):
+    """
+    Function draws multiple random samples, by 
+    repeatedly calling the 'get_sample_mean' function.
+    Args:
+        'data': xr.DataArray to draw samples from
+        'nsamples': number of samples to draw
+        'nyears': number of years in each sample
+
+    Returns:
+        'sample_means' xr.DataArray containing mean for each sample
+        
+    """
+
+    ## initialize empty list to hold sample means
+    sample_means = []
+
+    ## do the simulations inside a loop
+    for _ in range(nsamples):
+
+        ## select a random sample
+        sample_means.append(get_sample_mean(data, nyears))
+
+    ## concatenate list into xarray
+    sample_means = xr.concat(sample_means, dim="sample")
+    
+    return sample_means
+```
+
+7. <mark>To-do</mark>: Finally, __draw 3,000 random samples__ from the pre-industrial control output. For example,
+```python
+sample_means = get_sample_means(data=T2m_pico, nsamples=3000)
+```
+
+## Part 4: Make a histogram 
+8. __Compute the histogram__, using the ```np.histogram``` function (we'll manually specify the bins for the histogram):
+```python
+bin_width = 0.1
+bin_edges = np.arange(284.5, 286, bin_width)
+histogram_pico, _ = np.histogram(sample_means, bins=bin_edges)
+```
+
+9. <mark>To-do</mark>: __Compute index over last 30 years of historical simulation__, for comparison to the PI control. For example, compute this value with ```T2m_last30 = T2m_WH_hist.isel(year=slice(-30,None)).mean()```
+
+10. __Plot the histogram and stats__, using the following code (for example):
+```python
+## blank canvas for plotting
+fig, ax = plt.subplots(figsize=(4, 3))
+
+## plot the histogram
+ax.stairs(values=histogram_pico, edges=bin_edges, color="k", label="PI-control")
+
+## plot mean value for the PI control
+ax.axvline(sample_means.mean(), c="k", ls="--")
+
+## plot mean over last ~30 years
+ax.axvline(T2m_last30, c="r", ls="--", label=r"1984-2014")
+
+## label the plot
+ax.set_ylabel("# samples")
+ax.set_xlabel(r"$K$")
+ax.set_title(r"30-year average $T_{2m}$ in Woods Hole")
+ax.legend()
+
+plt.show()
+```
+
 
 
 ## Windows filepaths
